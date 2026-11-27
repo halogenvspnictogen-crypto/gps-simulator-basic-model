@@ -21,6 +21,7 @@ st.markdown("""<style>
 .metric-label{color:#9db0c4;font-size:.85rem}.metric-value{font-size:1.65rem;font-weight:700;color:#f3f7fc;margin-top:.2rem}.metric-note{color:#6dd1c7;font-size:.82rem}
 .callout{padding:1rem 1.2rem;background:#12283a;border-left:4px solid #58c8bb;border-radius:8px;margin:.7rem 0}
 div[data-testid="stMetric"]{background:#101d2b;border:1px solid #263b50;padding:14px;border-radius:12px}
+[data-testid="stMetricValue"]{color:#f3f7fc}
 h1,h2,h3{color:#f3f7fc} p,li{color:#d2dce8}
 </style>""", unsafe_allow_html=True)
 
