@@ -1,6 +1,6 @@
 # Mathematical model and derivation
 
-All calculations use SI units internally. Constants: `c = 299792458 m/s`, `GM = 3.986004418×10^14 m³/s²`, mean Earth radius `R_E = 6378000 m`, and standard GPS altitude `h = 20200000 m`. Orbital radius is measured from Earth's centre:
+All calculations use SI units internally. Constants: `c = 299792458 m/s`, `GM = 3.986004418×10^14 m³/s²`, equatorial Earth radius `R_E = 6378000 m`, and standard GPS altitude `h = 20200000 m`. Orbital radius is measured from Earth's centre:
 
 ```text
 r = R_E + h = 6378000 + 20200000 = 26578000 m

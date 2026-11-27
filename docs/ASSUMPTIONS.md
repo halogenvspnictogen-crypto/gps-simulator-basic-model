@@ -2,7 +2,7 @@
 
 ## Included in the core model
 
-- Spherical Earth with mean radius 6,378,000 m.
+- Spherical Earth with equatorial radius 6,378,000 m.
 - Circular orbit and standard gravitational parameter `GM`.
 - Weak-field gravitational time dilation.
 - Stationary, non-rotating ground reference clock.
