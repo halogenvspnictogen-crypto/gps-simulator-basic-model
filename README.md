@@ -20,7 +20,8 @@ The standard GPS reference gives approximately **−7.209 μs/day SR**, **+45.66
 4. Combined GPS clock correction with orbit calculations and reset.
 5. Positioning error accumulator for 1 hour, 1 day, 7 days, or 30 days.
 6. Experiment lab with altitude sweeps, reference comparison, and accumulated clock plot.
-7. Theory and assumptions guide.
+7. Theory & Derivations chapter with step-by-step orbital, SR, and GR derivations.
+8. Theory & Assumptions guide for scope and omitted operational effects.
 
 ## Technology
 
@@ -58,5 +59,7 @@ python -m unittest discover -s tests -v
 ## Model assumptions and limitations
 
 The model assumes a spherical Earth, circular orbit, standard gravitational parameter, weak-field gravitational time dilation, a stationary non-rotating surface reference clock, and first-order addition of SR and GR rate differences. It omits orbital eccentricity, Earth's rotation and geoid, Sagnac correction, signal propagation effects, atmospheric delays, multipath, satellite orbit errors, receiver clock bias, and other operational GPS corrections. Sagnac is a signal-propagation correction associated with Earth's rotating frame, not the gravitational clock-rate correction. Operational GPS accounts for additional effects and pre-adjusts satellite clock frequencies; this simulator is not a complete GPS receiver.
+
+In the conventional pseudorange equation, positive receiver clock bias adds `+cδt_r` and positive satellite clock bias adds `−cδt_s`. The simulator's range plot instead shows signed `cΔt` for the satellite clock difference; the magnitude is the equivalent range offset, not final receiver position error.
 
 See [docs/MATH_MODEL.md](docs/MATH_MODEL.md) for derivation and [docs/ASSUMPTIONS.md](docs/ASSUMPTIONS.md) for details.

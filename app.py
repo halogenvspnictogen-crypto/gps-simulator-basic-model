@@ -24,7 +24,7 @@ div[data-testid="stMetric"]{background:#101d2b;border:1px solid #263b50;padding:
 h1,h2,h3{color:#f3f7fc} p,li{color:#d2dce8}
 </style>""", unsafe_allow_html=True)
 
-PAGES = ["Overview", "Special Relativity Lab", "General Relativity Lab", "Combined GPS Correction", "Positioning Error", "Analysis / Experiment Lab", "Theory & Assumptions"]
+PAGES = ["Overview", "Special Relativity Lab", "General Relativity Lab", "Combined GPS Correction", "Positioning Error", "Analysis / Experiment Lab", "Theory & Derivations", "Theory & Assumptions"]
 with st.sidebar:
     st.markdown("## 🛰️ GPS Relativity")
     page = st.radio("Laboratory", PAGES, label_visibility="collapsed")
@@ -33,19 +33,24 @@ with st.sidebar:
     st.metric("Altitude", "20,200 km")
     st.caption("Spherical Earth · circular orbit · first-order clock-rate model")
 
-def chart_layout(fig, ytitle, title=None):
+def chart_layout(fig, ytitle, title=None, xtitle=None):
     fig.update_layout(template="plotly_dark", title=title, height=390, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(9,17,29,.6)",
-                      margin=dict(l=20,r=20,t=55,b=25), yaxis_title=ytitle, font=dict(color="#d8e3ef"), legend=dict(orientation="h", y=1.12))
-    fig.update_xaxes(gridcolor="#26384c")
-    fig.update_yaxes(gridcolor="#26384c", zerolinecolor="#8aa0b8")
+                      margin=dict(l=20,r=20,t=55,b=45), xaxis_title=xtitle, yaxis_title=ytitle,
+                      font=dict(color="#d8e3ef"), legend=dict(orientation="h", y=1.12))
+    fig.update_xaxes(gridcolor="#26384c", zerolinecolor="#8aa0b8")
+    fig.update_yaxes(gridcolor="#26384c", zerolinecolor="#dce7f5", zerolinewidth=2)
     return fig
 
 def correction_chart(c):
     fig=go.Figure()
-    for name,key,color in [("Special Relativity","sr_us_day","#63a8ff"),("General Relativity","gr_us_day","#58d1bd"),("Net","net_us_day","#f7bd63")]:
+    keys=[("Special Relativity","sr_us_day","#63a8ff"),("General Relativity","gr_us_day","#58d1bd"),("Net","net_us_day","#f7bd63")]
+    values=[c[key] for _,key,_ in keys]
+    low=min(0.0,min(values)); high=max(0.0,max(values))
+    pad=max(1.0,(high-low)*0.06)
+    for name,key,color in keys:
         fig.add_bar(name=name,x=[name],y=[c[key]],marker_color=color,text=[f"{c[key]:+.3f}"],textposition="outside")
-    fig.update_layout(barmode="group",showlegend=False)
-    return chart_layout(fig,"Clock correction (μs/day)","Daily clock-rate difference")
+    fig.update_layout(barmode="group",showlegend=False,yaxis=dict(range=[low-pad,high+pad]))
+    return chart_layout(fig,"Clock correction (μs/day)","Daily clock-rate correction by component","Component")
 
 def title(kicker,title,sub):
     st.markdown(f'<div class="hero"><div class="eyebrow">{kicker}</div><h1>{title}</h1><p>{sub}</p></div>',unsafe_allow_html=True)
@@ -83,7 +88,7 @@ elif page=="Special Relativity Lab":
     metric_row([("Speed",f"{velocity:,.1f} m/s","Input speed"),("Lorentz factor γ",f"{lorentz_factor(velocity):.12f}","γ = 1/√(1−v²/c²)"),("Fractional rate",f"{frac:.6e}","Moving clock rate minus reference rate"),("Daily difference",f"{rate:+.4f} μs/day","Negative means the moving clock loses time")])
     speeds=np.linspace(0,30_000,301); vals=np.array([sr_daily_us(float(v)) for v in speeds])
     fig=go.Figure(go.Scatter(x=speeds/1000,y=vals,mode="lines",line=dict(color="#63a8ff",width=3),name="SR correction"));fig.add_vline(x=velocity/1000,line_dash="dash",line_color="#f7bd63")
-    st.plotly_chart(chart_layout(fig,"SR correction (μs/day)","Motion makes the clock run slower"),use_container_width=True)
+    st.plotly_chart(chart_layout(fig,"SR correction (μs/day)","Motion makes the clock run slower","Satellite speed (km/s)"),use_container_width=True)
 
 elif page=="General Relativity Lab":
     title("ISOLATED EFFECT · GRAVITY","General Relativity Lab","Compare weak-field clock rates at Earth's surface and above it.")
@@ -94,7 +99,7 @@ elif page=="General Relativity Lab":
     metric_row([("Altitude",f"{altitude/1000:,.0f} km","Above the reference surface"),("Surface potential",f"{gravitational_potential(EARTH_RADIUS):.4e} J/kg","Φ = −GM/Rₑ"),("Satellite potential",f"{gravitational_potential(radius):.4e} J/kg","Φ = −GM/r"),("Daily difference",f"{rate:+.4f} μs/day","Positive means higher clock gains time")])
     hs=np.linspace(0,40_000_000,301); ys=np.array([gr_daily_us(float(h)) for h in hs])
     fig=go.Figure(go.Scatter(x=hs/1000,y=ys,mode="lines",line=dict(color="#58d1bd",width=3),name="GR correction"));fig.add_vline(x=altitude/1000,line_dash="dash",line_color="#f7bd63")
-    st.plotly_chart(chart_layout(fig,"GR correction (μs/day)","Higher altitude means a faster clock"),use_container_width=True)
+    st.plotly_chart(chart_layout(fig,"GR correction (μs/day)","Higher altitude means a faster clock","Altitude above Earth's surface (km)"),use_container_width=True)
     st.caption("The horizontal axis is altitude above the spherical surface; the comparison is differential, so it is zero at zero altitude.")
 
 elif page=="Combined GPS Correction":
@@ -122,7 +127,34 @@ elif page=="Combined GPS Correction":
 elif page=="Positioning Error":
     title("ACCUMULATION · RANGE EQUIVALENT","Positioning Error Simulator","Translate accumulated clock differences into an equivalent signal range offset.")
     st.latex(r"\Delta d=c\,\Delta t")
-    st.write("A timing offset changes the distance inferred from a signal's travel time. This pseudorange-equivalent value is not the receiver's final position error: real receivers estimate their clock bias and position from signals from multiple satellites.")
+    st.markdown("### A — How GPS measures distance")
+    st.write("GPS satellites transmit radio signals containing timing information. A receiver compares the signal's transmitted time with its approximate reception time to estimate how long the signal travelled. Multiplying travel time by the speed of light gives an idealized distance.")
+    st.latex(r"d=c\,\Delta t")
+    st.write("Here d is the idealized signal distance in metres, c is the speed of light in metres per second, and Δt is signal travel time in seconds. For Δt = 0.07 s:")
+    st.latex(r"d=299792458\times0.07=20985472.06\ {\rm m}\approx20985\ {\rm km}")
+    st.caption("This idealized distance is before clock biases and propagation delays are accounted for.")
+
+    st.markdown("### B — What is pseudorange?")
+    st.write("The measured travel time is not exact geometric travel time because the satellite and receiver clocks may differ from GPS system time. Let d be geometric satellite-to-receiver distance, δt_s the satellite clock bias, δt_r the receiver clock bias, and ρ the measured pseudorange. With this sign convention:")
+    st.latex(r"\rho=d+c(\delta t_r-\delta t_s)")
+    st.write("A positive receiver clock bias adds +cδt_r to pseudorange. A positive satellite clock bias subtracts cδt_s. A simplified model also includes propagation and remaining measurement errors:")
+    st.latex(r"\rho=d+c(\delta t_r-\delta t_s)+I+T+\varepsilon")
+    st.write("I is ionospheric delay, T is tropospheric delay, and ε represents remaining measurement errors; each is expressed in metres. It is called a pseudorange because it is a distance-like measurement containing clock and propagation terms, rather than just the geometric distance.")
+
+    st.markdown("### C — How relativistic clock errors affect pseudorange")
+    st.write("At the standard GPS orbit, the simplified clock-rate model gives these changes in the satellite clock relative to the ground reference:")
+    st.markdown("- **SR:** −7.209 μs/day (satellite clock loses time)\n- **GR:** +45.662 μs/day (satellite clock gains time)\n- **Net satellite clock change:** +38.453 μs/day")
+    st.latex(r"\Delta t_{net}=\Delta t_{SR}+\Delta t_{GR}")
+    st.write("This simulator's `pseudorange_error()` uses the signed clock-derived range equivalent cΔt. Thus a positive net satellite clock gain produces a positive value in the simulator's range-equivalent convention:")
+    st.latex(r"|\Delta d|=c|\Delta t_{net}|=299792458\times38.453\times10^{-6}\approx11528\ {\rm m}=11.528\ {\rm km/day}")
+    st.info("Keep three signs distinct: the satellite clock gains +38.453 μs/day; the conventional pseudorange satellite-clock term is −cδt_s for a positive satellite clock bias; the magnitude of the equivalent range offset is +11.528 km/day. The simulator plots signed cΔt, not the −cδt_s measurement-model term.")
+
+    st.markdown("### D — From pseudorange to position")
+    st.write("A receiver uses each satellite's known position and one pseudorange measurement to constrain its location. In an unconstrained three-dimensional fix, it solves for x, y, z and receiver clock bias δt_r. At least four independent satellite measurements are required for these four unknowns. This geometric process is called trilateration: distance constraints from multiple satellites intersect to locate the receiver.")
+    st.warning("The 11.528 km/day figure is an equivalent range error associated with an uncorrected clock offset. It is not necessarily an 11.528 km error in the receiver's final calculated position. This application does not implement a receiver or trilateration solver.")
+
+    st.markdown("### Interactive clock-derived range accumulation")
+    st.write("The controls below accumulate the SR, GR, and net clock-rate differences for the selected duration. The plotted sign convention remains signed cΔt for the satellite clock difference.")
     c=gps_correction(GPS_ALTITUDE); hours=st.select_slider("Elapsed time",options=[1,24,24*7,24*30],value=24,format_func=lambda h:{1:"1 hour",24:"1 day",168:"7 days",720:"30 days"}[h],key="duration_hours")
     seconds=hours*3600; labels=["Special Relativity","General Relativity","Net"]
     components=[c["sr_fractional"]*seconds,c["gr_fractional"]*seconds,c["net_fractional"]*seconds]
@@ -130,9 +162,9 @@ elif page=="Positioning Error":
     metric_row([("Elapsed",f"{hours:g} h","Accumulation period"),("SR clock difference",f"{components[0]*1e6:+.3f} μs",f"Range equivalent {distances[0]/1000:+.3f} km"),("GR clock difference",f"{components[1]*1e6:+.3f} μs",f"Range equivalent {distances[1]/1000:+.3f} km"),("Net range equivalent",f"{distances[2]/1000:+.3f} km","Clock-derived pseudorange equivalent")])
     xs=np.linspace(0,seconds,120)
     fig=go.Figure()
-    for name,rate,color in [(labels[0],c["sr_fractional"],"#63a8ff"),(labels[1],c["gr_fractional"],"#58d1bd"),(labels[2],c["net_fractional"],"#f7bd63")]:fig.add_scatter(x=xs/3600,y=np.array([pseudorange_error(rate*float(t))/1000 for t in xs]),mode="lines",name=name,line=dict(color=color,width=3))
-    st.plotly_chart(chart_layout(fig,"Pseudorange equivalent (km)","Clock-derived range offset accumulates linearly"),use_container_width=True)
-    st.caption("Range equivalents use cΔt. Real navigation solutions combine measurements and estimate receiver clock bias; this plot is not a receiver position simulation.")
+    for name,rate,color in [("SR clock · cΔt",c["sr_fractional"],"#63a8ff"),("GR clock · cΔt",c["gr_fractional"],"#58d1bd"),("Net clock · cΔt",c["net_fractional"],"#f7bd63")]:fig.add_scatter(x=xs/3600,y=np.array([pseudorange_error(rate*float(t))/1000 for t in xs]),mode="lines",name=name,line=dict(color=color,width=3))
+    st.plotly_chart(chart_layout(fig,"Signed range equivalent, cΔt (km)","Accumulated clock-derived range equivalent","Elapsed time (hours)"),use_container_width=True)
+    st.caption("Curves plot signed cΔt for each clock-rate difference. For a positive satellite clock bias, its contribution in the conventional pseudorange equation is −cδt_s. This graph is not actual receiver position error.")
 
 elif page=="Analysis / Experiment Lab":
     title("PARAMETER SWEEP · EXPERIMENT","Analysis / Experiment Lab","Vary altitude and compare your selected circular orbit with the standard GPS reference.")
@@ -148,12 +180,76 @@ elif page=="Analysis / Experiment Lab":
     fig=go.Figure()
     for key,name,color in [("sr_us_day","SR","#63a8ff"),("gr_us_day","GR","#58d1bd"),("net_us_day","Net","#f7bd63")]:fig.add_scatter(x=hs/1000,y=[x[key] for x in sweep],mode="lines",name=name,line=dict(color=color,width=3))
     fig.add_vline(x=altitude/1000,line_dash="dash",line_color="#f3f7fc",annotation_text="selected")
-    st.plotly_chart(chart_layout(fig,"Clock correction (μs/day)","Relativistic components versus altitude"),use_container_width=True)
+    st.plotly_chart(chart_layout(fig,"Clock correction (μs/day)","Relativistic components versus altitude","Altitude above Earth's surface (km)"),use_container_width=True)
     days=st.slider("Clock accumulation window (days)",1,30,7,key="analysis_days")
     ts=np.linspace(0,days*DAY,120); fig2=go.Figure()
     for rate,name,color in [(c["sr_fractional"],"SR","#63a8ff"),(c["gr_fractional"],"GR","#58d1bd"),(c["net_fractional"],"Net","#f7bd63")]:fig2.add_scatter(x=ts/DAY,y=[rate*float(t)*1e6 for t in ts],mode="lines",name=name,line=dict(color=color,width=3))
-    st.plotly_chart(chart_layout(fig2,"Accumulated clock difference (μs)","Clock difference builds over time"),use_container_width=True)
+    st.plotly_chart(chart_layout(fig2,"Accumulated clock difference (μs)","Clock difference builds over time","Elapsed time (days)"),use_container_width=True)
     st.caption("Circular-orbit speed and weak-field gravity are recalculated at every altitude. Rates are treated as constant over the selected accumulation interval.")
+
+elif page=="Theory & Derivations":
+    orbit_ref=circular_orbit(GPS_ALTITUDE)
+    deriv_ref=gps_correction(GPS_ALTITUDE)
+    range_ref=pseudorange_error(deriv_ref["net_fractional"]*DAY)
+    title("VIVA CHAPTER · FROM MODEL TO RESULT","Theory & Derivations","Build the GPS clock corrections from orbital mechanics, a light clock, and weak-field gravity.")
+    st.write("The derivation compares a satellite clock with a stationary surface reference in a simplified spherical, non-rotating model. Each section introduces the physical idea, derives the equation, and then connects it to the simulator.")
+    st.markdown("### A — Reference model and orbital radius")
+    st.write(f"The model constants are c = {C:.0f} m/s, GM = {3.986004418e14:.9e} m³/s², Earth's mean radius Rₑ = {EARTH_RADIUS:.0f} m, and standard GPS altitude h = {GPS_ALTITUDE:.0f} m.")
+    st.write("Altitude h is measured upward from the chosen Earth surface. Orbital radius r is measured from Earth's centre, so it includes the Earth radius:")
+    st.latex(r"r=R_E+h=6378000+20200000=26578000\ {\rm m}")
+    st.write("The following derivations use these standard GPS values; the interactive labs allow the parameters to vary.")
+
+    with st.expander("B — Derive circular orbital velocity and period",expanded=True):
+        st.write("Newtonian gravity attracts a satellite of mass m toward Earth's centre. For a circular orbit, the required centripetal force has the expression below. Gravity supplies the centripetal acceleration; these are not separate forces to add.")
+        st.latex(r"F_{gravity}=\frac{GMm}{r^2},\qquad F_{centripetal}=\frac{mv^2}{r}")
+        st.write("Set the gravitational force equal to the force requirement for circular motion, then cancel the nonzero satellite mass m:")
+        st.latex(r"\frac{GMm}{r^2}=\frac{mv^2}{r}\quad\Longrightarrow\quad\frac{GM}{r^2}=\frac{v^2}{r}\quad\Longrightarrow\quad\frac{GM}{r}=v^2")
+        st.latex(r"v=\sqrt{\frac{GM}{r}}")
+        st.write(f"Substituting the reference values gives v = √(3.986004418×10¹⁴ / 26,578,000) = **{orbit_ref['velocity_m_s']:,.3f} m/s**. One orbit covers circumference 2πr at this speed:")
+        st.latex(r"T=\frac{2\pi r}{v}")
+        st.write(f"T = **{orbit_ref['period_s']:,.0f} s ≈ {orbit_ref['period_s']/3600:.2f} hours**. This calculation assumes a circular orbit and a central spherical gravitational field.")
+
+    with st.expander("C — Derive the special-relativistic correction",expanded=True):
+        st.write("Proper time Δτ is time measured by a clock along its own path. Coordinate time Δt is the time interval assigned by the chosen stationary reference frame. For a light clock at rest, two mirrors are separated by distance L; light travels vertically between them in each half-cycle.")
+        st.latex(r"c\,\frac{\Delta\tau}{2}=L")
+        st.write("For an observer who sees the light clock move horizontally at speed v, the light follows a diagonal path during that half-cycle. The horizontal displacement is vΔt/2, so Pythagoras gives:")
+        st.latex(r"\left(c\frac{\Delta t}{2}\right)^2=L^2+\left(v\frac{\Delta t}{2}\right)^2")
+        st.write("Substitute L=cΔτ/2 and simplify:")
+        st.latex(r"c^2\Delta t^2=c^2\Delta\tau^2+v^2\Delta t^2")
+        st.latex(r"\frac{\Delta\tau}{\Delta t}=\sqrt{1-\frac{v^2}{c^2}},\qquad \gamma=\frac{1}{\sqrt{1-v^2/c^2}}")
+        st.write("The satellite clock's fractional rate difference from the stationary clock is its rate ratio minus one:")
+        st.latex(r"\epsilon_{SR}=\sqrt{1-v^2/c^2}-1")
+        st.write("This is negative because for any nonzero v, the square root is less than one. The satellite clock therefore accumulates less proper time in this kinematic comparison. Using the circular-orbit speed:")
+        st.latex(r"\epsilon_{SR}\approx-8.3434\times10^{-11},\qquad\Delta t_{SR}=\epsilon_{SR}\times86400\ {\rm s}")
+        st.write(f"The result is **{deriv_ref['sr_us_day']:+.3f} μs/day**. Numerically, the code uses x=v²/c² and an equivalent stable form to avoid cancellation when x is tiny:")
+        st.latex(r"\epsilon_{SR}=-\frac{x}{1+\sqrt{1-x}},\qquad x=\frac{v^2}{c^2}")
+
+    with st.expander("D — Derive the weak-field gravitational correction",expanded=True):
+        st.write("With gravitational potential zero at infinity, the Newtonian potential is negative near Earth. At larger r, Φ is less negative (closer to zero), corresponding to a weaker gravitational field:")
+        st.latex(r"\Phi=-\frac{GM}{r}")
+        st.write("For a stationary clock in the ideal Schwarzschild spacetime, the clock rate relative to coordinate time is:")
+        st.latex(r"\frac{d\tau}{dt}=\sqrt{1-\frac{2GM}{rc^2}}")
+        st.write("For Earth, 2GM/(rc²) is very small. Using √(1−x) ≈ 1−x/2 for small x gives the weak-field limit:")
+        st.latex(r"\frac{d\tau}{dt}\approx1-\frac{GM}{rc^2}=1+\frac{\Phi}{c^2}")
+        st.write("Compare two stationary clocks at the satellite radius and the Earth's surface. To first order, divide their rates and retain the leading difference:")
+        st.latex(r"\left(\frac{d\tau_S}{dt}\right)\approx1+\frac{\Phi_S}{c^2},\quad\left(\frac{d\tau_E}{dt}\right)\approx1+\frac{\Phi_E}{c^2},\quad\frac{d\tau_S}{d\tau_E}\approx1+\frac{\Phi_S-\Phi_E}{c^2}")
+        st.latex(r"\epsilon_{GR}=\frac{\Phi_S-\Phi_E}{c^2}=\frac{GM}{c^2}\left(\frac{1}{R_E}-\frac{1}{r}\right)")
+        st.write("At positive altitude r>Rₑ, the term in parentheses is positive, so the higher satellite clock runs faster from the gravitational contribution. For the reference orbit:")
+        st.latex(r"\epsilon_{GR}\approx+5.2850\times10^{-10},\qquad\Delta t_{GR}=\epsilon_{GR}\times86400\ {\rm s}")
+        st.write(f"The result is **{deriv_ref['gr_us_day']:+.3f} μs/day**. The Schwarzschild expression above is for a stationary clock; it is not the complete rate formula for a moving satellite. This simulator separately calculates the leading kinematic SR contribution and weak-field gravitational contribution, then combines them to first order.")
+
+    with st.expander("E — Combine the effects",expanded=True):
+        st.write("The educational model adds the leading fractional rate differences. Products between corrections of order 10⁻¹⁰ are of order 10⁻²⁰ and are neglected:")
+        st.latex(r"\epsilon_{net}\approx\epsilon_{SR}+\epsilon_{GR}=-8.3434\times10^{-11}+5.2850\times10^{-10}\approx+4.45066\times10^{-10}")
+        st.latex(r"\Delta t_{net}=\epsilon_{net}\times86400\ {\rm s}\approx+38.453\ {\rm \mu s/day}")
+        st.write("SR slows the moving satellite clock; GR speeds it relative to the ground. At standard GPS altitude, GR dominates, so the net satellite clock rate is faster.")
+
+    st.markdown("### F — Numerical summary")
+    metric_row([("Orbital radius",f'{orbit_ref["radius_m"]:,.0f} m',"r = Rₑ + h"),("Orbital velocity",f'{orbit_ref["velocity_m_s"]:,.3f} m/s',"Circular orbit"),("Orbital period",f'{orbit_ref["period_s"]/3600:.2f} h',"About 11.98 hours"),("Range magnitude",f'{abs(range_ref)/1000:.3f} km/day',"|cΔt_net|")])
+    metric_row([("SR",f'{deriv_ref["sr_us_day"]:+.3f} μs/day',"Kinematic contribution"),("GR",f'{deriv_ref["gr_us_day"]:+.3f} μs/day',"Gravitational contribution"),("Net",f'{deriv_ref["net_us_day"]:+.3f} μs/day',"First-order sum")])
+
+    st.markdown("### G — Continue exploring")
+    st.markdown("- **Orbital mechanics and net correction:** Combined GPS Correction\n- **SR derivation's what-if behavior:** Special Relativity Lab\n- **GR altitude dependence:** General Relativity Lab\n- **Net correction with changed orbit:** Combined GPS Correction\n- **Clock-to-range conversion:** Positioning Error")
 
 else:
     title("REFERENCE · THEORY","Theory & Assumptions","A compact derivation of what the simulator computes and what it leaves out.")
